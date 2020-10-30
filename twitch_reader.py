@@ -80,7 +80,7 @@ class BotSpawner:
                 print(f"removing stale channel: {to_remove}")
                 self.bots.pop(to_remove).terminate()
 
-            time.sleep(60 * 20)
+            time.sleep(60 * 5)
 
     def _poll_top_channels(self):
         token_url = "https://id.twitch.tv/oauth2/token"
@@ -91,7 +91,7 @@ class BotSpawner:
         })
         token = token_request.json()["access_token"]
 
-        url = "https://api.twitch.tv/helix/streams/?game_id=510218&language=en&first=5"
+        url = "https://api.twitch.tv/helix/streams/?game_id=510218&language=en&first=100"
         headers = {
             'client-id': self.client_id,
             'Accept': 'application/vnd.twitchtv.v5+json',
