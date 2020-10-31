@@ -45,7 +45,7 @@ class ChatMessage:
         for tag in obj["tags"]:
             key = tag["key"]
             value = tag["value"]
-            print(f"key: {key}, value: {value}")
+            # print(f"key: {key}, value: {value}")
             {
                 "badge-info": lambda: setattr(self, "badge_info", value),
                 "badges": lambda: setattr(self, "badges", value.split(",") if value else []),
