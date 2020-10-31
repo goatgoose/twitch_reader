@@ -1,6 +1,7 @@
 import os
 from chat_message import ChatMessage
 from channel_file import ChannelFile
+from chat_context import ChatContext
 import json
 import numpy as np
 import sys
@@ -11,7 +12,7 @@ class ChatReader:
     def __init__(self, data_dir):
         self.data_dir = data_dir
 
-        self.blacklisted_users = {"nightbot", "streamelements", "fossabot", "streamlabs"}
+        self.blacklisted_users = {"nightbot", "streamelements", "fossabot", "streamlabs", "moobot"}
 
     def replay(self):
         channels = []
@@ -22,7 +23,7 @@ class ChatReader:
                     continue
                 channels.append(ChannelFile(path))
 
-        last_channel = {}  # user : last active channel name
+        chat_contexts = {}  # user : last active channel name
         next_messages = [f.next() for f in channels]
         while True:
             min_timestamp = float("inf")
@@ -45,12 +46,16 @@ class ChatReader:
             user = min_message.user
 
             if user not in self.blacklisted_users:
-                if user not in last_channel:
-                    last_channel[user] = min_message.channel
-                if min_message.channel != last_channel[user]:
-                    if user not in self.blacklisted_users:
-                        print(f"[{min_message.timestamp}] {last_channel[user]} -> {min_message.channel} [{user}]: {min_message.content}")
-                        last_channel[user] = min_message.channel
+                if user not in chat_contexts:
+                    chat_contexts[user] = ChatContext(user)
+                chat_context = chat_contexts[user]
+                chat_context.log_message(min_message)
+
+                most_common_channel, occurrences = chat_context.active_channel
+                if min_message.channel != most_common_channel:
+                    if occurrences > 2:
+                        print(f"[{min_message.timestamp}] {most_common_channel} "
+                              f"({occurrences}) -> {min_message.channel} [{user}]: {min_message.content}")
 
             next_messages[min_index] = min_channel.next()
 
