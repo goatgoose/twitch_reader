@@ -6,6 +6,9 @@ import json
 import numpy as np
 import sys
 import time
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
+
+sid = SentimentIntensityAnalyzer()
 
 
 class ChatReader:
@@ -54,8 +57,10 @@ class ChatReader:
                 most_common_channel, occurrences = chat_context.active_channel
                 if min_message.channel != most_common_channel:
                     if occurrences > 2:
+                        sentiment_score = sid.polarity_scores(min_message.content)
                         print(f"[{min_message.timestamp}] {most_common_channel} "
-                              f"({occurrences}) -> {min_message.channel} [{user}]: {min_message.content}")
+                              f"({occurrences}) -> {min_message.channel} [{user}] "
+                              f"({sentiment_score['compound']}): {min_message.content}")
 
             next_messages[min_index] = min_channel.next()
 
