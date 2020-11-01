@@ -1,6 +1,6 @@
 import os
 from chat_message import ChatMessage
-from channel_file import ChannelFile
+from chat_file import ChannelFile
 from chat_context import ChatContext
 import json
 import numpy as np
@@ -8,6 +8,8 @@ import sys
 import time
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from datetime import datetime
+import requests
+import subprocess
 
 sid = SentimentIntensityAnalyzer()
 
@@ -17,6 +19,38 @@ class ChatReader:
         self.data_dir = data_dir
 
         self.blacklisted_users = {"nightbot", "streamelements", "fossabot", "streamlabs", "moobot"}
+
+    def write_harassed(self):
+        hopped_file = open("hopped_messages.json", "r")
+        harassed_file = open("hopped_harassed.json", "w")
+        for line in hopped_file.readlines():
+            message = ChatMessage(json.loads(line))
+            message.parse_custom()
+
+            r = subprocess.run([
+                "curl",
+                "-X",
+                "POST",
+                "http://localhost:5000/model/predict",
+                "-H",
+                "accept: application/json",
+                "-H",
+                "Content-Type: application/json",
+                "-d",
+                json.dumps({
+                    "text": [message.content]
+                })
+            ], capture_output=True)
+            try:
+                obj = json.loads(r.stdout)
+                toxicity = obj["results"][0]["predictions"]["toxic"]
+
+                message.toxicity = toxicity
+                harassed_file.write(message.to_custom_json() + "\n")
+                print(f"({toxicity}): {message.content}")
+
+            except (json.JSONDecodeError, KeyError):
+                print(f"could not parse: {r.stdout}, {message.content}")
 
     def write_hopped(self):
         chat_contexts = {}  # user : last active channel name
@@ -81,4 +115,4 @@ class ChatReader:
 
 if __name__ == '__main__':
     reader = ChatReader("../chat_data/data1")
-    reader.write_hopped()
+    reader.write_harassed()

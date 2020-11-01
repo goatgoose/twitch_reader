@@ -43,6 +43,8 @@ class ChatMessage:
         self.messages_in_from = None
         self.vader_score = None
 
+        self.toxicity = None
+
     def parse_custom(self):
         obj = self.message_obj
 
@@ -64,7 +66,8 @@ class ChatMessage:
         self.user_id = obj["user_id"]
         self.user_type = obj["user_type"]
         self.client_nonce = obj["client_nonce"]
-        self.is_emote_only = obj["is_emote_only"]
+        if "is_emote_only" in obj:
+            self.is_emote_only = obj["is_emote_only"]
         self.bits = obj["bits"]
         self.message_id = obj["message_id"]
         self.custom_reward_id = obj["custom_reward_id"]
@@ -83,6 +86,9 @@ class ChatMessage:
         self.hopped_to = obj["hopped_to"]
         self.messages_in_from = obj["messages_in_from"]
         self.vader_score = obj["vader_score"]
+
+        if "toxicity" in obj:
+            self.toxicity = obj["toxicity"]
 
     def parse_twitch(self):
         obj = self.message_obj
@@ -143,6 +149,7 @@ class ChatMessage:
             "user_id": self.user_id,
             "user_type": self.user_type,
             "client_nonce": self.client_nonce,
+            "is_emote_only": self.is_emote_only,
             "bits": self.bits,
             "message_id": self.message_id,
             "custom_reward_id": self.custom_reward_id,
@@ -157,6 +164,7 @@ class ChatMessage:
             "hopped_from": self.hopped_from,
             "hopped_to": self.hopped_to,
             "messages_in_from": self.messages_in_from,
-            "vader_score": self.vader_score
+            "vader_score": self.vader_score,
+            "toxicity": self.toxicity
         }
         return json.dumps(obj)
