@@ -3,8 +3,9 @@ import json
 
 
 class ChannelFile:
-    def __init__(self, path):
+    def __init__(self, path, custom_json=False):
         self.path = path
+        self.custom_json = custom_json
 
         self.file = open(path, "r")
 
@@ -20,5 +21,8 @@ class ChannelFile:
             return None
 
         message = ChatMessage(obj)
-        message.parse_twitch()
+        if self.custom_json:
+            message.parse_custom()
+        else:
+            message.parse_twitch()
         return message

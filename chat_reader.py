@@ -7,6 +7,7 @@ import numpy as np
 import sys
 import time
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
+from datetime import datetime
 
 sid = SentimentIntensityAnalyzer()
 
@@ -17,6 +18,34 @@ class ChatReader:
 
         self.blacklisted_users = {"nightbot", "streamelements", "fossabot", "streamlabs", "moobot"}
 
+    def write_hopped(self):
+        chat_contexts = {}  # user : last active channel name
+
+        for message in self.replay():
+            user = message.user
+
+            if user not in self.blacklisted_users:
+                if user not in chat_contexts:
+                    chat_contexts[user] = ChatContext(user)
+                chat_context = chat_contexts[user]
+                chat_context.log_message(message)
+
+                most_common_channel, occurrences = chat_context.active_channel
+                if message.channel != most_common_channel:
+                    if occurrences > 2:
+                        sentiment_score = sid.polarity_scores(message.content)
+                        message.hopped_from = most_common_channel
+                        message.hopped_to = message.channel
+                        message.messages_in_from = occurrences
+                        message.vader_score = sentiment_score
+
+                        dt = datetime.fromtimestamp(message.timestamp)
+                        print(f"[{dt}] {message.hopped_from} "
+                              f"({message.messages_in_from}) -> {message.hopped_to} [{message.user}] "
+                              f"({message.vader_score['compound']}): {message.content}")
+                        with open(f"hopped_messages.json", "a+") as hopped_file:
+                            hopped_file.write(message.to_custom_json() + "\n")
+
     def replay(self):
         channels = []
         for root, dirs, files in os.walk(self.data_dir):
@@ -26,7 +55,6 @@ class ChatReader:
                     continue
                 channels.append(ChannelFile(path))
 
-        chat_contexts = {}  # user : last active channel name
         next_messages = [f.next() for f in channels]
         while True:
             min_timestamp = float("inf")
@@ -46,25 +74,11 @@ class ChatReader:
             min_message = next_messages[min_index]
             min_channel = channels[min_index]
 
-            user = min_message.user
-
-            if user not in self.blacklisted_users:
-                if user not in chat_contexts:
-                    chat_contexts[user] = ChatContext(user)
-                chat_context = chat_contexts[user]
-                chat_context.log_message(min_message)
-
-                most_common_channel, occurrences = chat_context.active_channel
-                if min_message.channel != most_common_channel:
-                    if occurrences > 2:
-                        sentiment_score = sid.polarity_scores(min_message.content)
-                        print(f"[{min_message.timestamp}] {most_common_channel} "
-                              f"({occurrences}) -> {min_message.channel} [{user}] "
-                              f"({sentiment_score['compound']}): {min_message.content}")
+            yield min_message
 
             next_messages[min_index] = min_channel.next()
 
 
 if __name__ == '__main__':
     reader = ChatReader("../chat_data/data1")
-    reader.replay()
+    reader.write_hopped()
