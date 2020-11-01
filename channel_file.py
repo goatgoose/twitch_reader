@@ -19,4 +19,6 @@ class ChannelFile:
         except json.JSONDecodeError:
             return None
 
-        return ChatMessage(obj)
+        message = ChatMessage(obj)
+        message.parse_twitch()
+        return message
