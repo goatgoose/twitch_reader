@@ -22,35 +22,42 @@ class ChatReader:
 
     def write_harassed(self):
         hopped_file = open("hopped_messages.json", "r")
-        harassed_file = open("hopped_harassed.json", "w")
+
+        to_submit = []
         for line in hopped_file.readlines():
-            message = ChatMessage(json.loads(line))
-            message.parse_custom()
+            next_message = ChatMessage(json.loads(line))
+            next_message.parse_custom()
+            to_submit.append(next_message)
 
-            r = subprocess.run([
-                "curl",
-                "-X",
-                "POST",
-                "http://localhost:5000/model/predict",
-                "-H",
-                "accept: application/json",
-                "-H",
-                "Content-Type: application/json",
-                "-d",
-                json.dumps({
-                    "text": [message.content]
-                })
-            ], capture_output=True)
-            try:
-                obj = json.loads(r.stdout)
-                toxicity = obj["results"][0]["predictions"]["toxic"]
+            if len(to_submit) == 1000:
+                r = subprocess.run([
+                    "curl",
+                    "-X",
+                    "POST",
+                    "http://localhost:5000/model/predict",
+                    "-H",
+                    "accept: application/json",
+                    "-H",
+                    "Content-Type: application/json",
+                    "-d",
+                    json.dumps({
+                        "text": [message.content for message in to_submit]
+                    })
+                ], capture_output=True)
+                try:
+                    obj = json.loads(r.stdout)
+                    with open("hopped_harassed.json", "a+") as harassed_file:
+                        for i, toxicity in obj["results"]:
+                            toxicity = obj["results"][i]["predictions"]["toxic"]
+                            message = to_submit[i]
+                            message.toxicity = toxicity
+                            harassed_file.write(message.to_custom_json() + "\n")
+                            print(f"({toxicity}): {message.content}")
+                except (json.JSONDecodeError, KeyError):
+                    print(f"could not parse: {r.stdout}")
 
-                message.toxicity = toxicity
-                harassed_file.write(message.to_custom_json() + "\n")
-                print(f"({toxicity}): {message.content}")
-
-            except (json.JSONDecodeError, KeyError):
-                print(f"could not parse: {r.stdout}, {message.content}")
+                del to_submit
+                to_submit = []
 
     def write_hopped(self):
         chat_contexts = {}  # user : last active channel name
