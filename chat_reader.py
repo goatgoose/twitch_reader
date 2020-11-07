@@ -122,10 +122,14 @@ class ChatReader:
             next_messages[min_index] = min_channel.next()
 
     def build_feature_csv(self):
+        start_timestamp = time.time()
+        with open("log.txt", "a+") as log_file:
+            log_file.write(f"start build_feature_csv: {str(datetime.fromtimestamp(start_timestamp))}")
+
         chat_contexts = {}  # user : last active channel name
         chat_blocks = {}  # channel : current block
 
-        block_max = 5
+        block_max = 0
         blocks_written = 0
         message_count = 0
 
@@ -185,6 +189,17 @@ class ChatReader:
                                 return
             for channel in expired_channels:
                 del chat_blocks[channel]
+
+        with open("chat_features.csv", "a+") as chat_features_file:
+            writer = csv.writer(chat_features_file)
+            for channel, chat_block in chat_blocks.items():
+                writer.writerow(chat_block.feature_vec())
+
+        finish_timestamp = time.time()
+        with open("log.txt", "a+") as log_file:
+            log_file.write(f"finish build_feature_csv: {str(datetime.fromtimestamp(finish_timestamp))} - "
+                           f"{(finish_timestamp - start_timestamp) / 60} minutes")
+
 
 if __name__ == '__main__':
     reader = ChatReader("../chat_data/data1")
