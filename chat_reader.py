@@ -2,6 +2,7 @@ import os
 from chat_message import ChatMessage
 from chat_file import ChannelFile
 from chat_context import ChatContext
+from chat_block import ChatBlock
 import json
 import numpy as np
 import sys
@@ -10,6 +11,7 @@ from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from datetime import datetime
 import requests
 import subprocess
+import csv
 
 sid = SentimentIntensityAnalyzer()
 
@@ -18,7 +20,7 @@ class ChatReader:
     def __init__(self, data_dir):
         self.data_dir = data_dir
 
-        self.blacklisted_users = {"nightbot", "streamelements", "fossabot", "streamlabs", "moobot"}
+        self.blacklisted_users = {"nightbot", "streamelements", "fossabot", "streamlabs", "moobot", "pretzelrocks"}
 
     def write_harassed(self):
         hopped_file = open("hopped_messages.json", "r")
@@ -119,7 +121,71 @@ class ChatReader:
 
             next_messages[min_index] = min_channel.next()
 
+    def build_feature_csv(self):
+        chat_contexts = {}  # user : last active channel name
+        chat_blocks = {}  # channel : current block
+
+        block_max = 5
+        blocks_written = 0
+        message_count = 0
+
+        for message in self.replay():
+            message_count += 1
+
+            user = message.user
+            channel = message.channel
+
+            dt = datetime.fromtimestamp(message.timestamp)
+            print(str(dt))
+
+            if user in self.blacklisted_users:
+                continue
+
+            if user not in chat_contexts:
+                chat_contexts[user] = ChatContext(user)
+            chat_context = chat_contexts[user]
+            chat_context.log_message(message)
+
+            sentiment_score = sid.polarity_scores(message.content)
+            message.vader_score = sentiment_score
+
+            most_common_channel, occurrences = chat_context.active_channel
+            if message.channel != most_common_channel:
+                if occurrences > 2:
+                    message.hopped_from = most_common_channel
+                    message.hopped_to = message.channel
+                    message.messages_in_from = occurrences
+
+            if channel not in chat_blocks:
+                chat_blocks[channel] = ChatBlock(channel, 60 * 60)
+            chat_block = chat_blocks[channel]
+            chat_block.log_message(message)
+
+            if chat_block.will_expire(message.timestamp):
+                with open("chat_features.csv", "a+") as chat_features_file:
+                    writer = csv.writer(chat_features_file)
+                    writer.writerow(chat_block.feature_vec())
+                blocks_written += 1
+                if block_max > 0:
+                    if blocks_written == block_max:
+                        return
+
+            # check for expired chat blocks
+            expired_channels = []
+            with open("chat_features.csv", "a+") as chat_features_file:
+                writer = csv.writer(chat_features_file)
+                for channel, chat_block in chat_blocks.items():
+                    if chat_block.will_expire(message.timestamp):
+                        writer.writerow(chat_block.feature_vec())
+                        expired_channels.append(channel)
+
+                        blocks_written += 1
+                        if block_max > 0:
+                            if blocks_written == block_max:
+                                return
+            for channel in expired_channels:
+                del chat_blocks[channel]
 
 if __name__ == '__main__':
     reader = ChatReader("../chat_data/data1")
-    reader.write_harassed()
+    reader.build_feature_csv()

@@ -30,17 +30,19 @@ class ChatBlock:
             self.turbo_message_count += 1
 
         if message.hopped_from:
-            if message.vader_score < -0.42:
+            if message.vader_score["compound"] < -0.42:
                 self.hopped_toxic_count += 1
-            elif message.vader_score > 0.42:
+            elif message.vader_score["compound"] > 0.42:
                 self.hopped_positive_count += 1
         else:
-            if message.vader_score < -0.42:
+            if message.vader_score["compound"] < -0.42:
                 self.self_toxic_count += 1
-            elif message.vader_score > 0.42:
+            elif message.vader_score["compound"] > 0.42:
                 self.self_positive_count += 1
 
     def will_expire(self, timestamp):
+        if self.start_timestamp is None:
+            return False
         return timestamp > self.start_timestamp + self.duration
 
     def _extrapolate_features(self, features):
@@ -50,7 +52,7 @@ class ChatBlock:
         extrapolated = []
         for feature in features:
             extrapolate = feature * (percent_remaining)
-            extrapolated.append(extrapolate)
+            extrapolated.append(int(extrapolate))
         return extrapolated
 
     def feature_vec(self):

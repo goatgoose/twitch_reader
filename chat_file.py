@@ -38,6 +38,8 @@ class ChannelFile(ChatFile):
 
     def next(self):
         obj = self._next()
+        if not obj:
+            return None
 
         message = ChatMessage(obj)
         if self.custom_json:
