@@ -150,6 +150,10 @@ class ChatReader:
             chat_context = chat_contexts[user]
             chat_context.log_message(message)
 
+            if channel not in chat_blocks:
+                chat_blocks[channel] = ChatBlock(channel, 60 * 60)
+            chat_block = chat_blocks[channel]
+
             sentiment_score = sid.polarity_scores(message.content)
             message.vader_score = sentiment_score
 
@@ -160,23 +164,15 @@ class ChatReader:
                     message.hopped_to = message.channel
                     message.messages_in_from = occurrences
 
-            if channel not in chat_blocks:
-                chat_blocks[channel] = ChatBlock(channel, 60 * 60)
-            chat_block = chat_blocks[channel]
-            chat_block.log_message(message)
-
-            if chat_block.will_expire(message.timestamp):
-                with open("chat_features.csv", "a+") as chat_features_file:
-                    writer = csv.writer(chat_features_file)
-                    writer.writerow(chat_block.feature_vec())
-                blocks_written += 1
-                if block_max > 0:
-                    if blocks_written == block_max:
-                        return
+            if message.hopped_from:
+                if message.hopped_from in chat_blocks:
+                    chat_blocks[message.hopped_from].log_message(message)
+            else:
+                chat_block.log_message(message)
 
             # check for expired chat blocks
             expired_channels = []
-            with open("chat_features.csv", "a+") as chat_features_file:
+            with open(sys.argv[2], "a+") as chat_features_file:
                 writer = csv.writer(chat_features_file)
                 for channel, chat_block in chat_blocks.items():
                     if chat_block.will_expire(message.timestamp):
@@ -190,7 +186,7 @@ class ChatReader:
             for channel in expired_channels:
                 del chat_blocks[channel]
 
-        with open("chat_features.csv", "a+") as chat_features_file:
+        with open(sys.argv[2], "a+") as chat_features_file:
             writer = csv.writer(chat_features_file)
             for channel, chat_block in chat_blocks.items():
                 writer.writerow(chat_block.feature_vec())
@@ -202,5 +198,6 @@ class ChatReader:
 
 
 if __name__ == '__main__':
-    reader = ChatReader("../chat_data/data1")
+    reader = ChatReader(sys.argv[1])
     reader.build_feature_csv()
+

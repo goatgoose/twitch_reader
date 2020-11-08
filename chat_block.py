@@ -21,24 +21,24 @@ class ChatBlock:
             self.start_timestamp = message.timestamp
         self.last_timestamp = message.timestamp
 
-        self.message_count += 1
-        if message.is_mod:
-            self.mod_message_count += 1
-        if message.is_subscriber:
-            self.sub_message_count += 1
-        if message.is_turbo:
-            self.turbo_message_count += 1
-
         if message.hopped_from:
-            if message.vader_score["compound"] < -0.42:
+            if message.vader_score["compound"] < -0.15:
                 self.hopped_toxic_count += 1
-            elif message.vader_score["compound"] > 0.42:
+            elif message.vader_score["compound"] > 0.15:
                 self.hopped_positive_count += 1
         else:
-            if message.vader_score["compound"] < -0.42:
+            if message.vader_score["compound"] < -0.15:
                 self.self_toxic_count += 1
-            elif message.vader_score["compound"] > 0.42:
+            elif message.vader_score["compound"] > 0.15:
                 self.self_positive_count += 1
+
+            self.message_count += 1
+            if message.is_mod:
+                self.mod_message_count += 1
+            if message.is_subscriber:
+                self.sub_message_count += 1
+            if message.is_turbo:
+                self.turbo_message_count += 1
 
     def will_expire(self, timestamp):
         if self.start_timestamp is None:
@@ -46,7 +46,12 @@ class ChatBlock:
         return timestamp > self.start_timestamp + self.duration
 
     def _extrapolate_features(self, features):
+        if not self.last_timestamp or not self.start_timestamp:
+            return features
         time_used = self.last_timestamp - self.start_timestamp
+        if time_used < 10:
+            return features
+
         percent_remaining = self.duration / time_used
 
         extrapolated = []
@@ -62,7 +67,9 @@ class ChatBlock:
             self.sub_message_count,
             self.turbo_message_count,
             self.self_toxic_count,
-            self.hopped_toxic_count
+            self.self_positive_count,
+            self.hopped_toxic_count,
+            self.hopped_positive_count
         ])
         return [
             self.channel,
