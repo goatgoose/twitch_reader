@@ -15,6 +15,8 @@ import csv
 
 sid = SentimentIntensityAnalyzer()
 
+RUN = "run2"
+
 
 class ChatReader:
     def __init__(self, data_dir):
@@ -123,7 +125,7 @@ class ChatReader:
 
     def build_feature_csv(self):
         start_timestamp = time.time()
-        with open("log.txt", "a+") as log_file:
+        with open(f"{RUN}/log.txt", "a+") as log_file:
             log_file.write(f"start build_feature_csv: {str(datetime.fromtimestamp(start_timestamp))}")
 
         chat_contexts = {}  # user : last active channel name
@@ -172,7 +174,7 @@ class ChatReader:
 
             # check for expired chat blocks
             expired_channels = []
-            with open(sys.argv[2], "a+") as chat_features_file:
+            with open(f"{RUN}/{sys.argv[2]}", "a+") as chat_features_file:
                 writer = csv.writer(chat_features_file)
                 for channel, chat_block in chat_blocks.items():
                     if chat_block.will_expire(message.timestamp):
@@ -192,12 +194,15 @@ class ChatReader:
                 writer.writerow(chat_block.feature_vec())
 
         finish_timestamp = time.time()
-        with open("log.txt", "a+") as log_file:
+        with open(f"{RUN}/log.txt", "a+") as log_file:
             log_file.write(f"finish build_feature_csv: {str(datetime.fromtimestamp(finish_timestamp))} - "
                            f"{(finish_timestamp - start_timestamp) / 60} minutes")
 
 
 if __name__ == '__main__':
+    if not os.path.isdir(RUN):
+        os.mkdir(RUN)
+
     reader = ChatReader(sys.argv[1])
     reader.build_feature_csv()
 
