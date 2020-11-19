@@ -27,7 +27,7 @@ class ChatBlock:
             elif message.vader_score["compound"] > 0.15:
                 self.hopped_positive_count += 1
         else:
-            if message.toxicity > 0.19:
+            if message.vader_score["compound"] < -0.15:
                 self.self_toxic_count += 1
             elif message.vader_score["compound"] > 0.15:
                 self.self_positive_count += 1

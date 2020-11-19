@@ -2,6 +2,7 @@ import nltk
 import re
 import pickle
 import string
+import gc
 
 MODEL_WEIGHT = 0.25
 THRESHOLD = 0.19
@@ -28,10 +29,13 @@ def clean_text(x):
     return x
 
 
+gc_count = 0
+
 def predict(model, message, vader_score):
     message = clean_text(message)
     message = vectorizer.transform([message]).toarray()
     prediction = model.predict(message).flatten()[0]
+
     return (prediction * MODEL_WEIGHT + vader_score * (1 - MODEL_WEIGHT)) / 2
 
 
