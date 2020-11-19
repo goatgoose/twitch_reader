@@ -25,14 +25,32 @@ class Graph:
         return list(edges_set)
 
     def bfs(self, start_id):
+        return self._search(start_id, 0)
+
+    def bfs_iter(self, start_id):
+        for node in self._search_iter(start_id, 0):
+            yield node
+
+    def dfs(self, start_id):
+        return self._search(start_id, -1)
+
+    def dfs_iter(self, start_id):
+        return self._search_iter(start_id, -1)
+
+    def _search(self, start_id, pop_index):
+        path = []
+        for node in self._search_iter(start_id, pop_index):
+            path.append(node)
+        return path
+
+    def _search_iter(self, start_id, pop_index):
         to_traverse = [self.nodes[start_id]]
         discovered = set()
-        path = []
 
         while len(to_traverse) > 0:
-            node = to_traverse.pop(0)
+            node = to_traverse.pop(pop_index)
             if node not in discovered:
-                path.append(node)
+                yield node
                 discovered.add(node)
 
             for head in node.edges:
@@ -40,7 +58,24 @@ class Graph:
                 if neighbor not in discovered:
                     to_traverse.append(neighbor)
 
-        return path
+    def is_cyclic(self):
+        if len(self.nodes) == 0:
+            return False
+
+        checked = set()
+        while len(checked) < len(self.nodes):
+            visited = set()
+            start = set(self.nodes.keys()).difference(checked).pop()
+            prev = None
+            for node in self.dfs_iter(start):
+                for neighbor in node.edges:
+                    if neighbor != prev and neighbor in visited:
+                        return True
+                visited.add(node.id)
+                prev = node.id
+            checked = checked.union(visited)
+
+        return False
 
     def __getitem__(self, item):
         return self.nodes.get(item)
@@ -60,7 +95,9 @@ class Graph:
     def copy(self):
         new_graph = self.__class__()
         for id_ in self.nodes:
-            new_graph.nodes[id_] = self.nodes[id_].copy()
+            new_graph.nodes[id_] = Node(self.nodes[id_].id)
+        for edge in self.edges():
+            new_graph.add_edge(edge.copy())
         return new_graph
 
 
@@ -83,9 +120,19 @@ class UndirectedGraph(Graph):
             del head.edges[tail_id]
 
     def maximum_spanning_tree(self):
+        st = UndirectedGraph()
+        for node in self.nodes.values():
+            st.add_node(Node(node.id))
+
         edges = self.edges()
         edges.sort(reverse=True, key=lambda edge: edge.weight)
 
+        while len(edges) > 0:
+            to_add = edges.pop(0).copy()
+            st.add_edge(to_add)
+            if st.is_cyclic():
+                st.remove_edge(to_add.nodes)
+        return st
 
 class Node:
     def __init__(self, id_):
@@ -109,6 +156,12 @@ class Edge:
     def __init__(self, nodes):
         self.nodes = nodes
 
+    def __str__(self):
+        return str(self.nodes)
+
+    def __repr__(self):
+        return str(self)
+
     def copy(self):
         return Edge(self.nodes)
 
@@ -117,6 +170,9 @@ class WeightedEdge(Edge):
     def __init__(self, nodes, weight):
         super().__init__(nodes)
         self.weight = weight
+
+    def __str__(self):
+        return super().__str__() + f" - ({self.weight})"
 
     def copy(self):
         return WeightedEdge(self.nodes, self.weight)
@@ -132,12 +188,11 @@ if __name__ == '__main__':
 
     graph.add_edge(WeightedEdge([1, 2], 1))
     graph.add_edge(WeightedEdge([2, 3], 2))
-    graph.add_edge(WeightedEdge([3, 2], 2))
-    graph.add_edge(WeightedEdge([3, 4], 3))
-
-    graph2 = graph.copy()
-    graph2.remove_edge([1, 2])
-    graph2.add_edge(WeightedEdge([1, 3], 1))
+    graph.add_edge(WeightedEdge([3, 4], 2))
+    graph.add_edge(WeightedEdge([4, 1], 3))
+    graph.add_edge(WeightedEdge([2, 4], 10))
 
     print(graph)
-    print(graph2)
+
+    st = graph.maximum_spanning_tree()
+    print(st)
