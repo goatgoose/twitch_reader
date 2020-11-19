@@ -2,3 +2,9 @@
 data
 hopped_messages.json
 node
+*.json
+*.csv
+*.zip
+.ipynb*
+__pycache__/*
+*.pyc
