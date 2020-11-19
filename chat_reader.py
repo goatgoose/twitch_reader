@@ -12,8 +12,11 @@ from datetime import datetime
 import requests
 import subprocess
 import csv
+from toxic_comments import driver
+import tensorflow as tf
 
 sid = SentimentIntensityAnalyzer()
+model = tf.keras.models.load_model("11_19_20_model.h5")
 
 RUN = "run2"
 
@@ -123,7 +126,7 @@ class ChatReader:
 
             next_messages[min_index] = min_channel.next()
 
-    def build_feature_csv(self):
+    def build_feature_csv(self, out):
         start_timestamp = time.time()
         with open(f"{RUN}/log.txt", "a+") as log_file:
             log_file.write(f"start build_feature_csv: {str(datetime.fromtimestamp(start_timestamp))}")
@@ -166,6 +169,8 @@ class ChatReader:
                     message.hopped_to = message.channel
                     message.messages_in_from = occurrences
 
+                    message.toxicity = driver.predict(model, message.content, message.vader_score["neg"])
+
             if message.hopped_from:
                 if message.hopped_from in chat_blocks:
                     chat_blocks[message.hopped_from].log_message(message)
@@ -188,7 +193,7 @@ class ChatReader:
             for channel in expired_channels:
                 del chat_blocks[channel]
 
-        with open(sys.argv[2], "a+") as chat_features_file:
+        with open(out, "a+") as chat_features_file:
             writer = csv.writer(chat_features_file)
             for channel, chat_block in chat_blocks.items():
                 writer.writerow(chat_block.feature_vec())
@@ -203,6 +208,12 @@ if __name__ == '__main__':
     if not os.path.isdir(RUN):
         os.mkdir(RUN)
 
-    reader = ChatReader(sys.argv[1])
-    reader.build_feature_csv()
+    reader = ChatReader("../chat_data/data1")
+    reader.build_feature_csv("chat_features1.csv")
+
+    reader = ChatReader("../chat_data/data2")
+    reader.build_feature_csv("chat_features2.csv")
+
+    reader = ChatReader("../chat_data/data3")
+    reader.build_feature_csv("chat_features3.csv")
 
