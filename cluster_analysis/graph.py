@@ -57,6 +57,12 @@ class Graph:
             ret += "\n"
         return ret
 
+    def copy(self):
+        new_graph = self.__class__()
+        for id_ in self.nodes:
+            new_graph.nodes[id_] = self.nodes[id_].copy()
+        return new_graph
+
 
 class UndirectedGraph(Graph):
     def add_edge(self, edge):
@@ -92,16 +98,28 @@ class Node:
     def __repr__(self):
         return str(self)
 
+    def copy(self):
+        node = Node(self.id)
+        for id_ in self.edges:
+            node.edges[id_] = self.edges[id_].copy()
+        return node
+
 
 class Edge:
     def __init__(self, nodes):
         self.nodes = nodes
+
+    def copy(self):
+        return Edge(self.nodes)
 
 
 class WeightedEdge(Edge):
     def __init__(self, nodes, weight):
         super().__init__(nodes)
         self.weight = weight
+
+    def copy(self):
+        return WeightedEdge(self.nodes, self.weight)
 
 
 if __name__ == '__main__':
@@ -117,5 +135,9 @@ if __name__ == '__main__':
     graph.add_edge(WeightedEdge([3, 2], 2))
     graph.add_edge(WeightedEdge([3, 4], 3))
 
+    graph2 = graph.copy()
+    graph2.remove_edge([1, 2])
+    graph2.add_edge(WeightedEdge([1, 3], 1))
+
     print(graph)
-    print(graph.bfs(1))
+    print(graph2)
