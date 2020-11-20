@@ -14,6 +14,7 @@ import subprocess
 import csv
 from toxic_comments import driver
 import tensorflow as tf
+import csv
 
 sid = SentimentIntensityAnalyzer()
 model = tf.keras.models.load_model("11_19_20_model.h5")
@@ -22,8 +23,8 @@ RUN = "run2"
 
 
 class ChatReader:
-    def __init__(self, data_dir):
-        self.data_dir = data_dir
+    def __init__(self, data_dirs):
+        self.data_dirs = data_dirs
 
         self.blacklisted_users = {"nightbot", "streamelements", "fossabot", "streamlabs", "moobot", "pretzelrocks"}
 
@@ -95,36 +96,37 @@ class ChatReader:
                             hopped_file.write(message.to_custom_json() + "\n")
 
     def replay(self):
-        channels = []
-        for root, dirs, files in os.walk(self.data_dir):
-            for name in files:
-                path = os.path.join(root, name)
-                if not path.endswith(".json"):
-                    continue
-                channels.append(ChannelFile(path))
+        for data_dir in self.data_dirs:
+            channels = []
+            for root, dirs, files in os.walk(data_dir):
+                for name in files:
+                    path = os.path.join(root, name)
+                    if not path.endswith(".json"):
+                        continue
+                    channels.append(ChannelFile(path))
 
-        next_messages = [f.next() for f in channels]
-        while True:
-            min_timestamp = float("inf")
-            min_index = -1
-            all_eof = True
-            for i, message in enumerate(next_messages):
-                if message:
-                    all_eof = False
-                else:
-                    continue
-                if message.timestamp < min_timestamp:
-                    min_timestamp = message.timestamp
-                    min_index = i
-            if all_eof:
-                break
+            next_messages = [f.next() for f in channels]
+            while True:
+                min_timestamp = float("inf")
+                min_index = -1
+                all_eof = True
+                for i, message in enumerate(next_messages):
+                    if message:
+                        all_eof = False
+                    else:
+                        continue
+                    if message.timestamp < min_timestamp:
+                        min_timestamp = message.timestamp
+                        min_index = i
+                if all_eof:
+                    break
 
-            min_message = next_messages[min_index]
-            min_channel = channels[min_index]
+                min_message = next_messages[min_index]
+                min_channel = channels[min_index]
 
-            yield min_message
+                yield min_message
 
-            next_messages[min_index] = min_channel.next()
+                next_messages[min_index] = min_channel.next()
 
     def build_feature_csv(self, out):
         start_timestamp = time.time()
@@ -179,7 +181,7 @@ class ChatReader:
 
             # check for expired chat blocks
             expired_channels = []
-            with open(f"{RUN}/{sys.argv[2]}", "a+") as chat_features_file:
+            with open(f"{RUN}/{out}", "a+") as chat_features_file:
                 writer = csv.writer(chat_features_file)
                 for channel, chat_block in chat_blocks.items():
                     if chat_block.will_expire(message.timestamp):
@@ -193,7 +195,7 @@ class ChatReader:
             for channel in expired_channels:
                 del chat_blocks[channel]
 
-        with open(out, "a+") as chat_features_file:
+        with open(f"{RUN}/{out}", "a+") as chat_features_file:
             writer = csv.writer(chat_features_file)
             for channel, chat_block in chat_blocks.items():
                 writer.writerow(chat_block.feature_vec())
@@ -203,17 +205,73 @@ class ChatReader:
             log_file.write(f"finish build_feature_csv: {str(datetime.fromtimestamp(finish_timestamp))} - "
                            f"{(finish_timestamp - start_timestamp) / 60} minutes")
 
+    def write_hopped_csv(self, out):
+        chat_contexts = {}  # user : last active channel name
+
+        for message in self.replay():
+            user = message.user
+
+            if user in self.blacklisted_users:
+                continue
+
+            if user not in chat_contexts:
+                chat_contexts[user] = ChatContext(user)
+            chat_context = chat_contexts[user]
+            chat_context.log_message(message)
+
+            most_common_channel, occurrences = chat_context.active_channel
+            if message.channel != most_common_channel:
+                if occurrences > 2:
+                    message.hopped_from = most_common_channel
+                    message.hopped_to = message.channel
+                    sentiment_score = sid.polarity_scores(message.content)
+                    message.messages_in_from = occurrences
+                    message.vader_score = sentiment_score
+                    message.toxicity = driver.predict(model, message.content, message.vader_score["neg"])
+
+                    dt = datetime.fromtimestamp(message.timestamp)
+                    print(f"[{dt}] {message.hopped_from} "
+                          f"({message.messages_in_from}) -> {message.hopped_to} [{message.user}] "
+                          f"({message.vader_score['compound']}): {message.content}")
+                    with open(f"{RUN}/{out}", "a+") as hopped_file:
+                        csv_writer = csv.writer(hopped_file)
+                        csv_writer.writerow([
+                            message.user,
+                            message.hopped_from,
+                            message.hopped_to,
+                            message.content,
+                            message.badge_info,
+                            message.badges,
+                            message.emotes,
+                            message.flags,
+                            message.id,
+                            message.is_mod,
+                            message.room_id,
+                            message.is_subscriber,
+                            message.tmi_sent_ts,
+                            message.is_turbo,
+                            message.user_type,
+                            message.is_emote_only,
+                            message.bits,
+                            message.sent_ts,
+                            message.timestamp,
+                            message.messages_in_from,
+                            message.vader_score["neg"],
+                            message.vader_score["neu"],
+                            message.vader_score["pos"],
+                            message.vader_score["compound"],
+                            message.toxicity
+                        ])
+
 
 if __name__ == '__main__':
     if not os.path.isdir(RUN):
         os.mkdir(RUN)
 
-    reader = ChatReader("../chat_data/data1")
-    reader.build_feature_csv("chat_features1.csv")
-
-    reader = ChatReader("../chat_data/data2")
-    reader.build_feature_csv("chat_features2.csv")
-
-    reader = ChatReader("../chat_data/data3")
-    reader.build_feature_csv("chat_features3.csv")
+    reader = ChatReader([
+        "../chat_data/data1",
+        "../chat_data/data2",
+        "../chat_data/data3"
+    ])
+    reader.write_hopped_csv("hopped.csv")
 
