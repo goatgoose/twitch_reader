@@ -59,9 +59,6 @@ class Graph:
                     to_traverse.append(neighbor)
 
     def is_cyclic(self):
-        if len(self.nodes) == 0:
-            return False
-
         checked = set()
         while len(checked) < len(self.nodes):
             visited = set()
@@ -74,8 +71,44 @@ class Graph:
                 visited.add(node.id)
                 prev = node.id
             checked = checked.union(visited)
+        return False
+
+    def is_cyclic_for_start(self, start):
+        to_traverse = [self.nodes[start]]
+        discovered = set()
+        parent = {start: None}
+
+        while len(to_traverse) > 0:
+            node = to_traverse.pop(-1)
+            prev = parent[node.id]
+
+            discovered.add(node)
+
+            for head in node.edges:
+                neighbor = self.nodes[head]
+                if neighbor in discovered:
+                    if neighbor.id != prev:
+                        return True
+                else:
+                    to_traverse.append(neighbor)
+                    parent[neighbor.id] = node.id
 
         return False
+
+    def disconnected_groups(self):
+        if len(self.nodes) == 0:
+            return []
+
+        groups = []
+        checked = set()
+        while len(checked) < len(self.nodes):
+            visited = set()
+            start = set(self.nodes.keys()).difference(checked).pop()
+            for node in self.dfs_iter(start):
+                visited.add(node.id)
+            checked = checked.union(visited)
+            groups.append(visited)
+        return groups
 
     def __getitem__(self, item):
         return self.nodes.get(item)
@@ -102,6 +135,12 @@ class Graph:
 
 
 class UndirectedGraph(Graph):
+    def __init__(self):
+        super().__init__()
+
+    def add_node(self, node):
+        super().add_node(node)
+
     def add_edge(self, edge):
         node1 = self.nodes[edge.nodes[0]]
         node2 = self.nodes[edge.nodes[1]]
@@ -127,12 +166,28 @@ class UndirectedGraph(Graph):
         edges = self.edges()
         edges.sort(reverse=True, key=lambda edge: edge.weight)
 
-        while len(edges) > 0:
-            to_add = edges.pop(0).copy()
+        for i, edge in enumerate(edges):
+            print(f"{i} / {len(edges)}")
+            to_add = edge.copy()
             st.add_edge(to_add)
-            if st.is_cyclic():
+            if st.is_cyclic_for_start(to_add.nodes[0]):
                 st.remove_edge(to_add.nodes)
         return st
+
+    def k_spanning_tree(self, k):
+        st = self.maximum_spanning_tree()
+        edges = st.edges()
+        edges.sort(key=lambda edge: edge.weight)
+        for i in range(k):
+            st.remove_edge(edges[i].nodes)
+        return st
+
+    @staticmethod
+    def k_spanning_tree_for_tree(k, st):
+        new_st = st.copy()
+        new_st.k_spanning_tree(k)
+        return new_st
+
 
 class Node:
     def __init__(self, id_):
@@ -188,11 +243,9 @@ if __name__ == '__main__':
 
     graph.add_edge(WeightedEdge([1, 2], 1))
     graph.add_edge(WeightedEdge([2, 3], 2))
-    graph.add_edge(WeightedEdge([3, 4], 2))
-    graph.add_edge(WeightedEdge([4, 1], 3))
-    graph.add_edge(WeightedEdge([2, 4], 10))
+    graph.add_edge(WeightedEdge([3, 4], 3))
+    graph.add_edge(WeightedEdge([4, 1], 4))
 
     print(graph)
 
-    st = graph.maximum_spanning_tree()
-    print(st)
+    print(graph.is_cyclic_for_start(1))
