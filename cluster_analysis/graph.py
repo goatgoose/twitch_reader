@@ -1,3 +1,8 @@
+import networkx as nx
+import matplotlib.pyplot as plt
+import random
+import math
+
 
 class Graph:
     def __init__(self):
@@ -110,6 +115,24 @@ class Graph:
             groups.append(visited)
         return groups
 
+    def disconnected_graphs(self):
+        graphs = []
+        for group in self.disconnected_groups():
+            new_graph = self.__class__()
+            for node_id in group:
+                new_graph.add_node(self.nodes[node_id])
+            graphs.append(new_graph)
+        return graphs
+
+    def plot(self, k=None, scale=1):
+        nx_g = nx.Graph()
+        nx_g.add_edges_from([edge.nodes for edge in self.edges()])
+
+        plt.figure(figsize=(50, 50))
+        spring_layout = nx.spring_layout(nx_g, k=k, scale=scale)
+        nx.draw(nx_g, spring_layout, with_labels=True, node_size=80, font_size=12)
+        plt.show()
+
     def __getitem__(self, item):
         return self.nodes.get(item)
 
@@ -188,6 +211,63 @@ class UndirectedGraph(Graph):
         new_st.k_spanning_tree(k)
         return new_st
 
+    def hcs_clusters(self):
+        pass
+
+    def minimum_cut(self):
+        # Karger's Algorithm
+        min_cut = Edge([None, None])
+        min_cut._stacked = len(self.nodes)
+
+        trials = len(self.nodes) ** 2 * int(math.log(len(self.nodes)))
+        for _ in range(trials):
+            mc_graph = self.copy()
+            for edge in mc_graph.edges():
+                edge._stacked = 1
+
+            while len(mc_graph.nodes) > 2:
+                random_node = random.choice(list(mc_graph.nodes.values()))
+                random_edge = random.choice(list(random_node.edges.values()))
+
+                node1 = mc_graph[random_edge.nodes[0]]
+                node2 = mc_graph[random_edge.nodes[1]]
+                mc_graph.remove_edge([node1.id, node2.id])
+
+                combined_ids = set()
+                for node in [node1, node2]:
+                    if hasattr(node, "_is_contraction_node"):
+                        for id_ in node.id:
+                            combined_ids.add(id_)
+                    else:
+                        combined_ids.add(node.id)
+
+                contraction_node = Node(frozenset(combined_ids))
+                contraction_node._is_contraction_node = True
+                mc_graph.add_node(contraction_node)
+
+                for node in [node1, node2]:
+                    edges = list(node.edges.values())
+                    for edge in edges:
+                        tail = edge.nodes[0] if edge.nodes[0] != node.id else edge.nodes[1]
+                        if tail in contraction_node.edges:
+                            contraction_node.edges[tail]._stacked += edge._stacked
+                        else:
+                            new_edge = Edge([contraction_node.id, tail])
+                            new_edge._stacked = edge._stacked
+                            mc_graph.add_edge(new_edge)
+                    while len(edges) > 0:
+                        to_remove = edges.pop(-1)
+                        mc_graph.remove_edge(to_remove.nodes)
+
+                del mc_graph.nodes[node1.id]
+                del mc_graph.nodes[node2.id]
+
+            cut = mc_graph.edges()[0]
+            if cut._stacked < min_cut._stacked:
+                min_cut = cut
+
+        return min_cut
+
 
 class Node:
     def __init__(self, id_):
@@ -245,7 +325,19 @@ if __name__ == '__main__':
     graph.add_edge(WeightedEdge([2, 3], 2))
     graph.add_edge(WeightedEdge([3, 4], 3))
     graph.add_edge(WeightedEdge([4, 1], 4))
+    graph.add_edge(WeightedEdge([1, 3], 4))
 
-    print(graph)
+    graph.add_node(Node(5))
+    graph.add_node(Node(6))
+    graph.add_node(Node(7))
 
-    print(graph.is_cyclic_for_start(1))
+    graph.add_edge(WeightedEdge([4, 5], 4))
+    graph.add_edge(WeightedEdge([5, 6], 4))
+    graph.add_edge(WeightedEdge([6, 7], 4))
+    graph.add_edge(WeightedEdge([7, 5], 4))
+
+    min_cut = graph.minimum_cut()
+    print(min_cut)
+    print(min_cut._stacked)
+
+    # graph.plot()
