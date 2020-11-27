@@ -2,6 +2,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import random
 import math
+import time
 
 
 class Graph:
@@ -211,8 +212,28 @@ class UndirectedGraph(Graph):
         new_st.k_spanning_tree(k)
         return new_st
 
-    def hcs_clusters(self):
-        pass
+    @staticmethod
+    def hcs_clusters(g, clusters=[]):
+        gs = [g_.copy() for g_ in g.disconnected_graphs()]
+        for g_ in gs:
+            start = time.process_time()
+            minimum_cut = g_.minimum_cut()
+            print(f"min cut time: {time.process_time() - start}")
+            if minimum_cut._stacked <= len(g_.nodes) / 2:
+                to_delete = []
+                for id_ in minimum_cut.nodes[0]:
+                    edges = g_.nodes[id_].edges.values()
+                    for edge in edges:
+                        for node in edge.nodes:
+                            if node in minimum_cut.nodes[1]:
+                                to_delete.append(edge)
+                while len(to_delete) > 0:
+                    g_.remove_edge(to_delete.pop(-1).nodes)
+
+                UndirectedGraph.hcs_clusters(g_, clusters)
+            else:
+                clusters.append(g_)
+        return clusters
 
     def minimum_cut(self):
         # Karger's Algorithm
@@ -266,6 +287,10 @@ class UndirectedGraph(Graph):
             if cut._stacked < min_cut._stacked:
                 min_cut = cut
 
+        if not isinstance(min_cut.nodes[0], frozenset):
+            min_cut.nodes[0] = frozenset([min_cut.nodes[0]])
+        if not isinstance(min_cut.nodes[1], frozenset):
+            min_cut.nodes[1] = frozenset([min_cut.nodes[1]])
         return min_cut
 
 
@@ -336,8 +361,11 @@ if __name__ == '__main__':
     graph.add_edge(WeightedEdge([6, 7], 4))
     graph.add_edge(WeightedEdge([7, 5], 4))
 
-    min_cut = graph.minimum_cut()
-    print(min_cut)
-    print(min_cut._stacked)
+    clusters = UndirectedGraph.hcs_clusters(graph)
+    print(graph)
+    print([cluster.nodes for cluster in clusters])
+    clusters = UndirectedGraph.hcs_clusters(graph)
+    print(graph)
+    print([cluster.nodes for cluster in clusters])
 
     # graph.plot()
