@@ -216,6 +216,10 @@ class UndirectedGraph(Graph):
     def hcs_clusters(g, clusters=[]):
         gs = [g_.copy() for g_ in g.disconnected_graphs()]
         for g_ in gs:
+            if len(g_.nodes) == 1:
+                clusters.append(g_)
+                continue
+
             start = time.process_time()
             minimum_cut = g_.minimum_cut()
             print(f"min cut time: {time.process_time() - start}")
@@ -240,7 +244,8 @@ class UndirectedGraph(Graph):
         min_cut = Edge([None, None])
         min_cut._stacked = len(self.nodes)
 
-        trials = len(self.nodes) ** 2 * int(math.log(len(self.nodes)))
+        trials = int((len(self.nodes) * (len(self.nodes) - 1)) / 2)
+        # trials = (len(self.nodes) ** 2) * int(math.log(len(self.nodes)))
         for _ in range(trials):
             mc_graph = self.copy()
             for edge in mc_graph.edges():
@@ -323,7 +328,7 @@ class Edge:
         return str(self)
 
     def copy(self):
-        return Edge(self.nodes)
+        return Edge([node.copy() for node in self.nodes])
 
 
 class WeightedEdge(Edge):
@@ -361,11 +366,11 @@ if __name__ == '__main__':
     graph.add_edge(WeightedEdge([6, 7], 4))
     graph.add_edge(WeightedEdge([7, 5], 4))
 
-    clusters = UndirectedGraph.hcs_clusters(graph)
+    clusters = UndirectedGraph.hcs_clusters(graph, [])
     print(graph)
     print([cluster.nodes for cluster in clusters])
-    clusters = UndirectedGraph.hcs_clusters(graph)
+    clusters = UndirectedGraph.hcs_clusters(graph, [])
     print(graph)
-    print([cluster.nodes for cluster in clusters])
+    print([[id_ for id_ in cluster.nodes] for cluster in clusters])
 
     # graph.plot()
