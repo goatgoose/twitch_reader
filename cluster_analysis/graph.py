@@ -221,7 +221,7 @@ class UndirectedGraph(Graph):
                 continue
 
             start = time.process_time()
-            minimum_cut = g_.minimum_cut()
+            minimum_cut = g_.karger_minimum_cut()
             print(f"min cut time: {time.process_time() - start}")
             if minimum_cut._stacked <= len(g_.nodes) / 2:
                 to_delete = []
@@ -239,13 +239,16 @@ class UndirectedGraph(Graph):
                 clusters.append(g_)
         return clusters
 
-    def minimum_cut(self):
-        # Karger's Algorithm
+    def karger_stein_minimum_cut(self, t):
+        pass
+
+    def karger_minimum_cut(self):
         min_cut = Edge([None, None])
         min_cut._stacked = len(self.nodes)
 
-        trials = int((len(self.nodes) * (len(self.nodes) - 1)) / 2)
-        # trials = (len(self.nodes) ** 2) * int(math.log(len(self.nodes)))
+        # trials = int((len(self.nodes) * (len(self.nodes) - 1)) / 2)
+        trials = (len(self.nodes) ** 2) * int(math.log(len(self.nodes)))
+        # trials = 1
         for _ in range(trials):
             mc_graph = self.copy()
             for edge in mc_graph.edges():
@@ -328,7 +331,7 @@ class Edge:
         return str(self)
 
     def copy(self):
-        return Edge([node.copy() for node in self.nodes])
+        return Edge([node for node in self.nodes])
 
 
 class WeightedEdge(Edge):
@@ -340,7 +343,7 @@ class WeightedEdge(Edge):
         return super().__str__() + f" - ({self.weight})"
 
     def copy(self):
-        return WeightedEdge(self.nodes, self.weight)
+        return WeightedEdge([node for node in self.nodes], self.weight)
 
 
 if __name__ == '__main__':
