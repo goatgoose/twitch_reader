@@ -153,6 +153,8 @@ class Graph:
         new_graph = self.__class__()
         for id_ in self.nodes:
             new_graph.nodes[id_] = Node(self.nodes[id_].id)
+            if hasattr(self.nodes[id_], "_is_contraction_node"):
+                new_graph.nodes[id_]._is_contraction_node = self.nodes[id_]._is_contraction_node
         for edge in self.edges():
             new_graph.add_edge(edge.copy())
         return new_graph
@@ -221,7 +223,7 @@ class UndirectedGraph(Graph):
                 continue
 
             start = time.process_time()
-            minimum_cut = g_.karger_minimum_cut()
+            minimum_cut = g_.karger_stein_minimum_cut()
             print(f"min cut time: {time.process_time() - start}")
             if minimum_cut._stacked <= len(g_.nodes) / 2:
                 to_delete = []
@@ -239,8 +241,62 @@ class UndirectedGraph(Graph):
                 clusters.append(g_)
         return clusters
 
-    def karger_stein_minimum_cut(self, t):
-        pass
+    def contract(self, t):
+        for edge in self.edges():
+            edge._stacked = 1
+
+        while len(self.nodes) > t:
+            random_node = random.choice(list(self.nodes.values()))
+            random_edge = random.choice(list(random_node.edges.values()))
+
+            node1 = self.nodes[random_edge.nodes[0]]
+            node2 = self.nodes[random_edge.nodes[1]]
+            self.remove_edge([node1.id, node2.id])
+
+            combined_ids = set()
+            for node in [node1, node2]:
+                if hasattr(node, "_is_contraction_node"):
+                    for id_ in node.id:
+                        combined_ids.add(id_)
+                else:
+                    combined_ids.add(node.id)
+
+            contraction_node = Node(frozenset(combined_ids))
+            contraction_node._is_contraction_node = True
+            self.add_node(contraction_node)
+
+            for node in [node1, node2]:
+                edges = list(node.edges.values())
+                for edge in edges:
+                    tail = edge.nodes[0] if edge.nodes[0] != node.id else edge.nodes[1]
+                    if tail in contraction_node.edges:
+                        contraction_node.edges[tail]._stacked += edge._stacked
+                    else:
+                        new_edge = Edge([contraction_node.id, tail])
+                        new_edge._stacked = edge._stacked
+                        self.add_edge(new_edge)
+                while len(edges) > 0:
+                    to_remove = edges.pop(-1)
+                    self.remove_edge(to_remove.nodes)
+
+            del self.nodes[node1.id]
+            del self.nodes[node2.id]
+
+    def karger_stein_minimum_cut(self):
+        if len(self.nodes) <= 6:
+            return self.karger_minimum_cut()
+
+        t = int((1 + len(self.nodes)) / math.sqrt(2))
+
+        g1 = self.copy()
+        g1.contract(t)
+        g2 = self.copy()
+        g2.contract(t)
+
+        g1_min_cut = g1.karger_stein_minimum_cut()
+        g2_min_cut = g2.karger_stein_minimum_cut()
+
+        return g1_min_cut if g1_min_cut._stacked < g2_min_cut._stacked else g2_min_cut
 
     def karger_minimum_cut(self):
         min_cut = Edge([None, None])
@@ -254,42 +310,7 @@ class UndirectedGraph(Graph):
             for edge in mc_graph.edges():
                 edge._stacked = 1
 
-            while len(mc_graph.nodes) > 2:
-                random_node = random.choice(list(mc_graph.nodes.values()))
-                random_edge = random.choice(list(random_node.edges.values()))
-
-                node1 = mc_graph[random_edge.nodes[0]]
-                node2 = mc_graph[random_edge.nodes[1]]
-                mc_graph.remove_edge([node1.id, node2.id])
-
-                combined_ids = set()
-                for node in [node1, node2]:
-                    if hasattr(node, "_is_contraction_node"):
-                        for id_ in node.id:
-                            combined_ids.add(id_)
-                    else:
-                        combined_ids.add(node.id)
-
-                contraction_node = Node(frozenset(combined_ids))
-                contraction_node._is_contraction_node = True
-                mc_graph.add_node(contraction_node)
-
-                for node in [node1, node2]:
-                    edges = list(node.edges.values())
-                    for edge in edges:
-                        tail = edge.nodes[0] if edge.nodes[0] != node.id else edge.nodes[1]
-                        if tail in contraction_node.edges:
-                            contraction_node.edges[tail]._stacked += edge._stacked
-                        else:
-                            new_edge = Edge([contraction_node.id, tail])
-                            new_edge._stacked = edge._stacked
-                            mc_graph.add_edge(new_edge)
-                    while len(edges) > 0:
-                        to_remove = edges.pop(-1)
-                        mc_graph.remove_edge(to_remove.nodes)
-
-                del mc_graph.nodes[node1.id]
-                del mc_graph.nodes[node2.id]
+            mc_graph.contract(2)
 
             cut = mc_graph.edges()[0]
             if cut._stacked < min_cut._stacked:
