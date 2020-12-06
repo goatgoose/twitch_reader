@@ -184,7 +184,7 @@ class UndirectedGraph(Graph):
         if tail_id in head.edges:
             del head.edges[tail_id]
 
-    def maximum_spanning_tree(self):
+    def maximum_spanning_tree(self, verbose=False):
         st = UndirectedGraph()
         for node in self.nodes.values():
             st.add_node(Node(node.id))
@@ -193,7 +193,8 @@ class UndirectedGraph(Graph):
         edges.sort(reverse=True, key=lambda edge: edge.weight)
 
         for i, edge in enumerate(edges):
-            print(f"{i} / {len(edges)}")
+            if verbose:
+                print(f"{i} / {len(edges)}")
             to_add = edge.copy()
             st.add_edge(to_add)
             if st.is_cyclic_for_start(to_add.nodes[0]):
@@ -215,7 +216,7 @@ class UndirectedGraph(Graph):
         return new_st
 
     @staticmethod
-    def hcs_clusters(g, clusters=[]):
+    def hcs_clusters(g, clusters=[], verbose=False):
         gs = [g_.copy() for g_ in g.disconnected_graphs()]
         for g_ in gs:
             if len(g_.nodes) == 1:
@@ -224,7 +225,9 @@ class UndirectedGraph(Graph):
 
             start = time.process_time()
             minimum_cut = g_.karger_stein_minimum_cut()
-            print(f"min cut time: {time.process_time() - start}")
+            finish = time.process_time() - start
+            if verbose:
+                print(f"cut time: {finish}")
             if minimum_cut._stacked <= len(g_.nodes) / 2:
                 to_delete = []
                 for id_ in minimum_cut.nodes[0]:
@@ -236,7 +239,7 @@ class UndirectedGraph(Graph):
                 while len(to_delete) > 0:
                     g_.remove_edge(to_delete.pop(-1).nodes)
 
-                UndirectedGraph.hcs_clusters(g_, clusters)
+                UndirectedGraph.hcs_clusters(g_, clusters, verbose)
             else:
                 clusters.append(g_)
         return clusters
